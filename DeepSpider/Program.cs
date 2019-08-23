@@ -226,6 +226,7 @@ namespace DeepSpider
                             //searches the clearnet with random adresses
                             case 'i':
                                 urlArray = new string[1];
+                                isList = false;
                                 Console.Clear();
                                 darknet = false;
                                 if (item.Length > 1)
@@ -461,6 +462,11 @@ namespace DeepSpider
                     if(listPos < urlArray.Length)
                     {
                         url = urlArray[listPos];
+                        url = url.Replace(splitChar[1], '\0').Replace(splitChar[2], '\0');
+                        if (url.IndexOf('\0') > 0)
+                        {
+                            url = url.Remove(url.IndexOf('\0'), url.Length - url.IndexOf('\0'));
+                        }                       
                         listPos++;
                     }
                     else
