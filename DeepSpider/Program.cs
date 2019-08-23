@@ -78,6 +78,7 @@ namespace DeepSpider
                         }
                         else break;
                     }
+                    //checks the variable name for every item in the cleaned list
                     if (config.Contains("connectionstring"))
                     {
                         config = config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0');
