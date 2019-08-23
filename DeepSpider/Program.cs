@@ -32,11 +32,13 @@ namespace DeepSpider
         private static bool badR;
         private static bool connect;
         private static bool darknet = false;
+        private static bool isList = false;
         private static bool update;
         private static char itemarg;
         private static char[] splitChar = new char[3];
         private static int amount;
         private static int counter = 0;
+        private static int listPos = 0;
         private static int urlLengthMax;
         private static int urlLengthMin;
         private static string config = "";
@@ -44,9 +46,11 @@ namespace DeepSpider
         private static string complexity = "";
         private static string location = "";
         private static string parameters = "";
+        private static string resultPath = "";
         private static string title = "";
         private static string tld = "";
         private static string url = "";
+        private static string[] urlArray;
         private static string connection_string = "";
         private static Random randomNr = new Random();
         private static Regex regEx = new Regex("([a - zA - Z]:(\\w +) *\\[a-zA-Z0_9]+)?.txt$");
@@ -68,8 +72,10 @@ namespace DeepSpider
                 splitChar[0] = '=';
                 //reset the config string
                 config = "";
+                //true, if the beginning of a line doesnt start with #. sorts out the first comments
                 if (!(s.ToCharArray()[0] == '#'))
                 {
+                    //iterates through the string and removes every char after a # to get rid of between variable comments
                     foreach (var c in s.ToCharArray())
                     {
                         if (c != '#')
@@ -79,8 +85,11 @@ namespace DeepSpider
                         else break;
                     }
                     //checks the variable name for every item in the cleaned list
+
+                    //sets the string to connect to  the db with
                     if (config.Contains("connectionstring"))
                     {
+                        //cleans the value from \n and \r and the variable name + =
                         config = config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0');
                         if (config.IndexOf('\0') > 0)
                         {
@@ -91,20 +100,26 @@ namespace DeepSpider
                         Console.WriteLine("Connection string read: " + connection_string);
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
                     }
+                    //sets the minimum url length
                     else if (config.Contains("urlLengthMin"))
                     {
+                        //cleans the value from \n and \r and the variable name + =
                         urlLengthMin = int.Parse(config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0'));
                         Console.WriteLine("Minimum URL length read: " + urlLengthMin);
                         Console.ForegroundColor = ConsoleColor.DarkGreen;
                     }
+                    //sets the maximum url length
                     else if (config.Contains("urlLengthMax"))
                     {
+                        //cleans the value from \n and \r and the variable name + =
                         urlLengthMax = int.Parse(config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0'));
                         Console.WriteLine("Maximum URL length read: " + urlLengthMax);
                         Console.ForegroundColor = ConsoleColor.DarkBlue;
                     }
+                    //sets the desired url complexity for the random url generation
                     else if (config.Contains("complexity"))
                     {
+                        //cleans the value from \n and \r and the variable name + =
                         config = config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0');
                         if (config.IndexOf('\0') > 0)
                         {
@@ -114,8 +129,10 @@ namespace DeepSpider
                         Console.WriteLine("Complexity read: " + complexity);
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
                     }
+                    //sets the top level domain to use
                     else if (config.Contains("tld"))
                     {
+                        //cleans the value from \n and \r and the variable name + =
                         config = config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0');
                         if (config.IndexOf('\0') > 0)
                         {
@@ -125,8 +142,10 @@ namespace DeepSpider
                         Console.WriteLine("Top level domain read: " + tld);
                         Console.ForegroundColor = ConsoleColor.DarkRed;
                     }
+                    //sets the filepath to a list of urls to conect to
                     else if (config.Contains("location"))
                     {
+                        //cleans the value from \n and \r and the variable name + =
                         config = config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0');
                         if (config.IndexOf('\0') > 0)
                         {
@@ -134,6 +153,19 @@ namespace DeepSpider
                         }
                         else location = config;
                         Console.WriteLine("Filepath to URLs.txt read: " + location);
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                    }
+                    //sets the filepath to an output file to write results to
+                    else if (config.Contains("resultPath"))
+                    {
+                        //cleans the value from \n and \r and the variable name + =
+                        config = config.Remove(0, config.IndexOf('=') + 1).Replace(splitChar[1], '\0').Replace(splitChar[2], '\0');
+                        if (config.IndexOf('\0') > 0)
+                        {
+                            resultPath = config.Remove(config.IndexOf('\0'), config.Length - config.IndexOf('\0'));
+                        }
+                        else resultPath = config;
+                        Console.WriteLine("Filepath to result.txt read: " + location);
                         Console.ForegroundColor = ConsoleColor.Green;
                     }
                 }
@@ -170,7 +202,7 @@ namespace DeepSpider
                     {
                         Console.Clear();
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("This Software is distributed under GNU GENERAL PUBLIC LICENSE Version 3.0 as is.");
+                        Console.WriteLine("This Software is distributed under GNU GENERAL PUBLIC LICENSE Version 3.0 and AS IS.");
                         Console.WriteLine("This means that there may be bugs in this Software or it may be unstable.");
                         Console.WriteLine("The original author is thereby not responsible for any money or time lost due to imperfections in this software.");
                         Console.ForegroundColor = ConsoleColor.White;
@@ -179,11 +211,22 @@ namespace DeepSpider
                     }
                     else if (item.Length > 0)
                     {
-                        itemarg = item.ToCharArray()[0];
+                        try{
+                            itemarg = item.ToCharArray()[0];
+                        }
+                        catch(FormatException)
+                        {
+                            Console.WriteLine("Please give me valid arguments...");
+                            Console.WriteLine("Enter all arguments and confirm with ENTER");
+                            UserInteraction(Console.ReadLine());
+                        }
+                        
                         switch (itemarg)
                         {
                             //searches the clearnet with random adresses
                             case 'i':
+                                urlArray = new string[1];
+                                Console.Clear();
                                 darknet = false;
                                 if (item.Length > 1)
                                 {
@@ -278,21 +321,52 @@ namespace DeepSpider
                                 }
                                 break;
 
-                            //scan all websites from a specified list -> -p
+                            //scan all websites from a specified list 
                             case 'l':
                                 if (item.Length > 1)
                                 {
                                     if (regEx.IsMatch(item.Remove(0, 1)))
                                     {
                                         location = item.Remove(0, 1);
-                                        textReader = new StreamReader(location);
+                                        isList = true;
                                     }
+                                }
+                                else if(location.Length > 1){
+                                    isList = true;
                                 }
                                 Console.Clear();
                                 Console.WriteLine("Crawling the Internet...");
                                 Console.WriteLine("Scanning all adresses from the list");
                                 darknet = false;
                                 connect = true;
+                                listPos = 0;
+                                if(isList){
+                                    try{
+                                        textReader = new StreamReader(location);
+                                    }
+                                    catch(Exception)
+                                    {
+                                        Console.ForegroundColor = ConsoleColor.Red;
+                                        Console.WriteLine("Please check your filepath");
+                                        Console.ForegroundColor = ConsoleColor.White;
+                                        Console.WriteLine("Enter all arguments and confirm with ENTER");
+                                        UserInteraction(Console.ReadLine());                                       
+                                    }
+                                    splitChar[0] = ';';
+                                    url = textReader.ReadToEnd();
+                                    urlArray = url.Split(splitChar[0]);
+                                    splitChar[0] = '<';
+                                    listPos = 0;
+                                    amount = urlArray.Length;
+                                }
+                                else
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine("Please check your filepath");
+                                    Console.ForegroundColor = ConsoleColor.White;
+                                    Console.WriteLine("Enter all arguments and confirm with ENTER");
+                                    UserInteraction(Console.ReadLine());
+                                }
                                 break;
                             /*
                             case 'p':
@@ -339,30 +413,29 @@ namespace DeepSpider
 
                 if (connect)
                 {
-                    Console.Clear();
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
                     Console.WriteLine("This is the spidey spider^^");
                     Console.ForegroundColor = ConsoleColor.White;
                     if (!darknet)
                     {
                         Console.WriteLine("Crawling the Web...");
-                        Console.WriteLine("Amount: " + amount + ", MaxLength: " + urlLengthMax + ", MinLength: " + urlLengthMin + ", URL Comlexity: " + complexity);
-                        using (MySqlConnection conn = new MySqlConnection())
+                        if(isList)
                         {
-                            conn.ConnectionString = connection_string;
-                            conn.Open();
-
-                            MySqlCommand command = new MySqlCommand("SELECT url FROM sites WHERE url = @url", conn);
-                            command.Parameters.Add(new MySqlParameter("url", url));
-
-                            if (command.ExecuteNonQuery() >= 1)
-                            {
-                                update = true;
-                            }
-
+                            Console.WriteLine("AMount of adresses in the list: " + amount);
                         }
+                        else
+                        {
+                            Console.WriteLine("Amount: " + amount + ", MaxLength: " + urlLengthMax + ", MinLength: " + urlLengthMin + ", URL Comlexity: " + complexity);
+                        }                      
                     }
-                    Connect(darknet, RandomURL(darknet));
+                    if(isList && listPos <= urlArray.Length)
+                    {
+                        Connect(darknet, "dummy");
+                    }
+                    else if(listPos < urlArray.Length)
+                    {
+                        Connect(darknet, RandomURL(darknet));
+                    }
                 }
             }
             else
@@ -383,7 +456,18 @@ namespace DeepSpider
                 //create a new httpclient to connect to the internet
                 HttpClient client = new HttpClient();
                 HttpResponseMessage answer = new HttpResponseMessage();
-
+                if(isList)
+                {
+                    if(listPos < urlArray.Length)
+                    {
+                        url = urlArray[listPos];
+                        listPos++;
+                    }
+                    else
+                    {
+                        EndDisplay();
+                    }
+                }
                 Console.WriteLine("Connecting to: " + url + "     | Sites Left: " + amount);
 
                 //trying to get the website
@@ -422,41 +506,52 @@ namespace DeepSpider
                         {
                             if (amount == 0)
                             {
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine("We did it! Woohoo!");
-                                Console.ForegroundColor = ConsoleColor.White;
-                                Console.WriteLine("Wanna search for more?");
-                                Console.WriteLine("To do that, you sadly have to restart the program.");
-                                Console.WriteLine("I haven't found a way yet to get around some pesky ReadKey() problems");
-
+                                EndDisplay();
                             }
                             else
                             {
-                                Connect(darknet, RandomURL(darknet));
+                                if(isList && listPos < urlArray.Length)
+                                {
+                                    Connect(darknet, "dummy");
+                                }
+                                else if(listPos < urlArray.Length)
+                                {
+                                    Connect(darknet, RandomURL(darknet));
+                                }
                             }
                         }
                         else
                         {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine("Something died while scraping!");
-                            Console.ForegroundColor = ConsoleColor.White;
-                            Connect(darknet, RandomURL(darknet));
+                            if(isList && listPos < urlArray.Length)
+                            {
+                                Connect(darknet, "dummy");
+                            }
+                            else if(listPos < urlArray.Length)
+                            {
+                                Connect(darknet, RandomURL(darknet));
+                            }
+                            else if (amount == 0)
+                            {
+                                EndDisplay();
+                            }
                         }
                     }
                     else
                     {
                         if (amount > 0)
                         {
-                            Connect(darknet, RandomURL(darknet));
+                            if(isList && listPos < urlArray.Length)
+                            {
+                                Connect(darknet, "dummy");
+                            }
+                            else if(listPos < urlArray.Length)
+                            {
+                                Connect(darknet, RandomURL(darknet));
+                            }
                         }
                         else if (amount == 0)
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.WriteLine("We did it...");
-                            Console.ForegroundColor = ConsoleColor.White;
-                            Console.WriteLine("Wanna search for more?");
-                            Console.WriteLine("To do that, you sadly have to restart the program.");
-                            Console.WriteLine("I haven't found a way yet to get around some pesky ReadKey() problems");
+                            EndDisplay();
                         }
                     }
                 }
@@ -464,16 +559,18 @@ namespace DeepSpider
                 {
                     if (amount > 0)
                     {
-                        Connect(darknet, RandomURL(darknet));
+                        if(isList && listPos < urlArray.Length)
+                        {
+                            Connect(darknet, "dummy");
+                        }
+                        else if(listPos < urlArray.Length)
+                        {
+                            Connect(darknet, RandomURL(darknet));
+                        }
                     }
                     else if (amount == 0)
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkGreen;
-                        Console.WriteLine("We did it...");
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.WriteLine("Wanna search for more?");
-                        Console.WriteLine("To do that, you sadly have to restart the program.");
-                        Console.WriteLine("I haven't found a way yet to get around some pesky ReadKey() problems");
+                        EndDisplay();
                     }
                 }
             }
@@ -497,20 +594,52 @@ namespace DeepSpider
                         title = item.Substring(6);
                     }
                 }
-
+                if(counter == 1)
+                {                                   
                 Console.WriteLine("Title extracted: ");
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.Write(title + "\n");
+                }
+                else
+                {
+                    title = url;
+                    Console.WriteLine("No Title found, using URL: ");
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
+                    Console.Write(title + "\n");
+                }
                 Console.ForegroundColor = ConsoleColor.White;
                 Console.WriteLine("Connecting to DataBase");
-
+                
                 //pushing the title and other information to a db
                 using (MySqlConnection conn = new MySqlConnection())
                 {
                     conn.ConnectionString = connection_string;
-                    conn.Open();
-                    MySqlCommand command = new MySqlCommand();
+                    MySqlCommand command;
 
+                    //checks on duplicats and updates the entry in the db correspondingly               
+                    try{
+                        conn.Open();
+                    }
+                    catch(MySqlException m){
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("There is a problem with MySql: " + m);
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("Go check your settings or server");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.WriteLine("You now end this program with ENTER");
+                        Console.ReadLine();
+                        Environment.Exit(1);
+                    }
+
+                    //selecting all occurances of the current url
+                    command = new MySqlCommand("SELECT url FROM sites WHERE url = @url", conn);
+                    command.Parameters.Add(new MySqlParameter("url", url));
+
+                    if (command.ExecuteNonQuery() >= 1)
+                    {
+                        update = true;
+                    }
+                    
                     if (update)
                     {
                         command = new MySqlCommand("UPDATE sites SET title = @title, time = @time, content = @content, sha128 = @hash", conn);
@@ -529,25 +658,48 @@ namespace DeepSpider
                         command.Parameters.Add(new MySqlParameter("hash", Hash(content)));
                     }
 
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine("Adding the entry to the DataBase");
-                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                    Console.WriteLine("Added to the DB - affected rows: " + command.ExecuteNonQuery());
-                    Console.ForegroundColor = ConsoleColor.White;
+                    if(update)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.WriteLine("Updating the entry in the DataBase");
+                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                        Console.WriteLine("Updated - affected rows: " + command.ExecuteNonQuery());
+                        Console.ForegroundColor = ConsoleColor.White;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.WriteLine("Adding the entry to the DataBase");
+                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                        Console.WriteLine("Added to the DB - affected rows: " + command.ExecuteNonQuery());
+                        Console.ForegroundColor = ConsoleColor.White;
+                    }
 
                     conn.Close();
                 }
 
-                if (counter == 1)
+                if (title.Length > 1)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine("Entry scraped successfully");
                     Console.ForegroundColor = ConsoleColor.White;
                     return true;
                 }
-                else return false;
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Something died while scraping!");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    return false;
+                }
             }
-            else return false;
+            else 
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Something died while scraping!");
+                Console.ForegroundColor = ConsoleColor.White;
+                return false;
+            }
         }
 
         //generates a new address to scrape
@@ -741,6 +893,16 @@ namespace DeepSpider
             Console.WriteLine("[show c]opyright information");
             Console.WriteLine("[show w]arranty information");
             Console.WriteLine("You may now restart the program");
+        }
+
+        private static void EndDisplay(){
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("We did it! Woohoo!");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine("Wanna search for more?");
+            Console.WriteLine("To do that, you sadly have to restart the program.");
+            Console.WriteLine("I haven't found a way yet to get around some pesky ReadKey() problems");
+            Console.WriteLine("ENTER will close the program");
         }
     }
 }
