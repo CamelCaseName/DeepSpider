@@ -1,0 +1,25 @@
+#This is the config.txt for DeepSpider
+#you can adjust different settings here
+#there must not be a space between th equal sign and the value!!
+#lines with a # are ignored
+#if you want to set a value, that line has to start with a percent symbol
+
+
+#Conection String for Mysql
+%connectionstring =Server=localhost;Database=mathebot_deepcrawler;Uid=root;Pwd=;
+
+#default minimal url length
+%urlLengthMin =4
+
+#default maximal url length
+%urlLengthMax =6
+
+#default url complexity
+#i strongly advise you not to use numbers
+%complexity =l
+
+#default top level domain
+%tld =.com
+
+#URLs.txt location
+%location =..\\..\\Resources\\URLs.txt
