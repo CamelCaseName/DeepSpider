@@ -32,7 +32,9 @@ namespace DeepSpider
         private static bool badR;
         private static bool connect;
         private static bool darknet = false;
+        private static bool hashing = true;
         private static bool isList = false;
+        private static bool resList = false;
         private static bool update;
         private static char itemarg;
         private static char[] splitChar = new char[3];
@@ -41,6 +43,7 @@ namespace DeepSpider
         private static int listPos = 0;
         private static int urlLengthMax;
         private static int urlLengthMin;
+        private static string connection_string = "";
         private static string config = "";
         private static string[] configArray;
         private static string complexity = "";
@@ -51,11 +54,11 @@ namespace DeepSpider
         private static string tld = "";
         private static string url = "";
         private static string[] urlArray;
-        private static string connection_string = "";
         private static Random randomNr = new Random();
         private static Regex regEx = new Regex("([a - zA - Z]:(\\w +) *\\[a-zA-Z0_9]+)?.txt$");
         private static TimeSpan span;
         private static TextReader textReader;
+        private static TextWriter writer;
 
         //main method
         private static void Main(string[] args)
@@ -66,7 +69,7 @@ namespace DeepSpider
             splitChar[1] = '\n';
             splitChar[2] = '\r';
             configArray = textReader.ReadToEnd().Split(splitChar[0]);
-            Console.WriteLine("reading config.txt");
+            Console.WriteLine("reading config.txt...");
             foreach (var s in configArray)
             {
                 splitChar[0] = '=';
@@ -165,7 +168,7 @@ namespace DeepSpider
                             resultPath = config.Remove(config.IndexOf('\0'), config.Length - config.IndexOf('\0'));
                         }
                         else resultPath = config;
-                        Console.WriteLine("Filepath to result.txt read: " + location);
+                        Console.WriteLine("Filepath to result.txt read: " + resultPath);
                         Console.ForegroundColor = ConsoleColor.Green;
                     }
                 }
@@ -221,7 +224,7 @@ namespace DeepSpider
                             UserInteraction(Console.ReadLine());
                         }
                         
-                        switch (itemarg)
+                        switch (itemarg) //all cases: i u m c l f n (s d o) h ?
                         {
                             //searches the clearnet with random adresses
                             case 'i':
@@ -369,12 +372,29 @@ namespace DeepSpider
                                     UserInteraction(Console.ReadLine());
                                 }
                                 break;
-                            /*
-                            case 'p':
+                            
+                            //saving to a local file, not a db
+                            case 'f':
+                                if (item.Length > 1)
+                                {
+                                    if (regEx.IsMatch(item.Remove(0, 1)))
+                                    {
+                                        resultPath = item.Remove(0, 1);
+                                        resList = true;
+                                    }
+                                }
+                                else if(resultPath.Length > 1){
+                                    resList = true;
+                                }
 
+                                writer = new StreamWriter(resultPath);
                                 break;
 
-
+                            //sets wether the entrys will be hashed or not
+                            case 'n':
+                                hashing = false;
+                                break;
+/*
                             case 's':
                                 Console.Clear();
                                 Console.WriteLine("Settings:");
@@ -600,12 +620,14 @@ namespace DeepSpider
                         title = item.Substring(6);
                     }
                 }
+
                 if(counter == 1)
                 {                                   
-                Console.WriteLine("Title extracted: ");
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write(title + "\n");
+                    Console.WriteLine("Title extracted: ");
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write(title + "\n");
                 }
+
                 else
                 {
                     title = url;
@@ -614,74 +636,95 @@ namespace DeepSpider
                     Console.Write(title + "\n");
                 }
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine("Connecting to DataBase");
-                
-                //pushing the title and other information to a db
-                using (MySqlConnection conn = new MySqlConnection())
+
+                //saving to a db
+                if(!resList)
                 {
-                    conn.ConnectionString = connection_string;
-                    MySqlCommand command;
-
-                    //checks on duplicats and updates the entry in the db correspondingly               
-                    try{
-                        conn.Open();
-                    }
-                    catch(MySqlException m){
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("There is a problem with MySql: " + m);
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("Go check your settings or server");
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.WriteLine("You now end this program with ENTER");
-                        Console.ReadLine();
-                        Environment.Exit(1);
-                    }
-
-                    //selecting all occurances of the current url
-                    command = new MySqlCommand("SELECT url FROM sites WHERE url = @url", conn);
-                    command.Parameters.Add(new MySqlParameter("url", url));
-
-                    if (command.ExecuteNonQuery() >= 1)
+                    Console.WriteLine("Connecting to DataBase");
+                
+                    //pushing the title and other information to a db
+                    using (MySqlConnection conn = new MySqlConnection())
                     {
-                        update = true;
-                    }
-                    
-                    if (update)
-                    {
-                        command = new MySqlCommand("UPDATE sites SET title = @title, time = @time, content = @content, sha128 = @hash", conn);
-                        command.Parameters.Add(new MySqlParameter("title", title));
-                        command.Parameters.Add(new MySqlParameter("time", DateTime.Now));
-                        command.Parameters.Add(new MySqlParameter("content", content));
-                        command.Parameters.Add(new MySqlParameter("hash", Hash(content)));
-                    }
-                    else
-                    {
-                        command = new MySqlCommand("INSERT INTO sites (title, id, time, url, content, sha128) VALUES (@title, '', @time, @url, @content, @hash)", conn);
-                        command.Parameters.Add(new MySqlParameter("title", title));
-                        command.Parameters.Add(new MySqlParameter("time", DateTime.Now));
+                        conn.ConnectionString = connection_string;
+                        MySqlCommand command;
+
+                        //checks on duplicats and updates the entry in the db correspondingly               
+                        try{
+                            conn.Open();
+                        }
+                        catch(MySqlException m){
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("There is a problem with MySql: " + m);
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine("Go check your settings or server");
+                            Console.ForegroundColor = ConsoleColor.White;
+                            Console.WriteLine("You may now end this program with ENTER");
+                            Console.ReadLine();
+                            Environment.Exit(1);
+                        }
+
+                        //selecting all occurances of the current url
+                        command = new MySqlCommand("SELECT * FROM sites WHERE url = @url", conn);
                         command.Parameters.Add(new MySqlParameter("url", url));
-                        command.Parameters.Add(new MySqlParameter("content", content));
-                        command.Parameters.Add(new MySqlParameter("hash", Hash(content)));
-                    }
 
-                    if(update)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.WriteLine("Updating the entry in the DataBase");
-                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                        Console.WriteLine("Updated - affected rows: " + command.ExecuteNonQuery());
-                        Console.ForegroundColor = ConsoleColor.White;
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.WriteLine("Adding the entry to the DataBase");
-                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                        Console.WriteLine("Added to the DB - affected rows: " + command.ExecuteNonQuery());
-                        Console.ForegroundColor = ConsoleColor.White;
-                    }
+                        if (command.ExecuteReader().Read())
+                        {                       
+                            update = true;
+                        }
+                    
+                        command.Dispose();
 
-                    conn.Close();
+                        if (update)
+                        {
+                            command.CommandText = "UPDATE sites SET title = @title, time = @time, content = @content, sha128 = @hash WHERE url = @url";
+                            command.Parameters.Add(new MySqlParameter("title", title));
+                            command.Parameters.Add(new MySqlParameter("time", DateTime.Now));
+                            command.Parameters.Add(new MySqlParameter("content", content));
+                            command.Parameters.Add(new MySqlParameter("hash", Hash(content)));
+                        }
+                        else
+                        {
+                            command.CommandText = "INSERT INTO sites (title, id, time, url, content, sha128) VALUES (@title, '', @time, @url, @content, @hash)";
+                            command.Parameters.Add(new MySqlParameter("title", title));
+                            command.Parameters.Add(new MySqlParameter("time", DateTime.Now));
+                            command.Parameters.Add(new MySqlParameter("content", content));
+                            command.Parameters.Add(new MySqlParameter("hash", Hash(content)));
+                        }
+
+                        if(update)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.WriteLine("Updating the entry in the DataBase");
+
+                            if(command.ExecuteNonQuery() > 0)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                                Console.WriteLine("Updated!");
+                            }
+                            else
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine("Couldn't update for some reason");
+                            }                      
+                            Console.ForegroundColor = ConsoleColor.White;
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.WriteLine("Adding the entry to the DataBase");
+                            Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                            Console.WriteLine("Added to the DB - affected rows: " + command.ExecuteNonQuery());
+                            Console.ForegroundColor = ConsoleColor.White;
+                        }
+
+                        conn.Close();
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Writing to the specified output file.");
+
+                    writer.Write("<title>"+title+"</title>"+"<time>"+DateTime.Now+"</time>"+"<sitecontent>"+content+"</sitecontent>"+"<hash>"+Hash(content)+"</hash>");       
                 }
 
                 if (title.Length > 1)
@@ -866,24 +909,31 @@ namespace DeepSpider
         //generates a sha1 hash for the given string
         private static string Hash(string input)
         {
-            Console.WriteLine("Hashing the Website for change detection");
-
-            using (SHA1Managed sha1 = new SHA1Managed())
+            if(hashing)
             {
-                //hash generation
-                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
-                var sb = new StringBuilder(hash.Length * 2);
+                Console.WriteLine("Hashing the Website for change detection");
 
-                //stitching the hash to a nice string
-                foreach (byte b in hash)
+                using (SHA1Managed sha1 = new SHA1Managed())
                 {
-                    sb.Append(b.ToString("x2"));
-                }
+                    //hash generation
+                    var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
+                    var sb = new StringBuilder(hash.Length * 2);
 
-                return sb.ToString();
+                    //stitching the hash to a nice string
+                    foreach (byte b in hash)
+                    {
+                        sb.Append(b.ToString("x2"));
+                    }
+
+                    return sb.ToString();
+                }
+            }
+            else
+            {
+                return "";
             }
         }
-
+        
         private static void Help()
         {
             Console.Clear();
@@ -902,6 +952,10 @@ namespace DeepSpider
         }
 
         private static void EndDisplay(){
+            if(resList)
+            {
+                writer.Close();
+            }
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("We did it! Woohoo!");
             Console.ForegroundColor = ConsoleColor.White;
