@@ -10,6 +10,9 @@ Use parameter -u followed by a number to set the Minimum URL length used for the
 Use parameter -m followed by a number to set the Maximum URL length for the generated adresses.  <br />
 Use parameter -c followed by a combination of 'l' for letters, 'n' for numbers and 's' for dashes  <br />
 Use parameter -l followed by a filepath to a .txt file to scan all websites from the given list  <br />
+-f is used to write to the specified output file <br />
+To generate URLS iteratively use -j followed by a number to indicate the amount. The normal complexity applies.<br />
+Hashing can be very ineffective and slow. To stop hashing every find use -n  <br />
 In this file, all URLs must be seperated with a ';'.  <br />
 Adding the parameter -h or -? or not providing any parameter at all prints out a help page similar to this.  <br />
 If you start the Program with "show c", the license will be printed  <br />
