@@ -17,7 +17,11 @@
 
 using MySql.Data.MySqlClient;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.IO.Ports;
+using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -36,13 +40,18 @@ namespace DeepSpider
         private static bool isList = false;
         private static bool resList = false;
         private static bool update;
+        private static char[] complexityArr = new char[4];
         private static char itemarg;
         private static char[] splitChar = new char[3];
+        private static int[] urlCharArr;
         private static int amount;
+        private static int count = 0;
         private static int counter = 0;
+        private static int iteration =0 ;
         private static int listPos = 0;
         private static int urlLengthMax;
         private static int urlLengthMin;
+        private static List<char> urlChars = new List<char>();
         private static string connection_string = "";
         private static string config = "";
         private static string[] configArray;
@@ -56,6 +65,7 @@ namespace DeepSpider
         private static string[] urlArray;
         private static Random randomNr = new Random();
         private static Regex regEx = new Regex("([a - zA - Z]:(\\w +) *\\[a-zA-Z0_9]+)?.txt$");
+        private static Stopwatch watchy = new Stopwatch();
         private static TimeSpan span;
         private static TextReader textReader;
         private static TextWriter writer;
@@ -224,7 +234,7 @@ namespace DeepSpider
                             UserInteraction(Console.ReadLine());
                         }
                         
-                        switch (itemarg) //all cases: i u m c l f n (s d o) h ?
+                        switch (itemarg) //all cases: i u m c l f n j (s d o) h ?
                         {
                             //searches the clearnet with random adresses
                             case 'i':
@@ -309,7 +319,7 @@ namespace DeepSpider
 
                             //specify the complexity
                             case 'c':
-                                if (item.Length > 1)
+                                if (item.Length > 1 && item.Length <7)
                                 {
                                     if (!item.Remove(0, 1).Contains("l") && !item.Remove(0, 1).Contains("n") && !item.Remove(0, 1).Contains("s"))
                                     {
@@ -322,6 +332,13 @@ namespace DeepSpider
                                     {
                                         complexity = item.Remove(0, 1);
                                     }
+                                }
+                                else
+                                {
+                                    Console.Clear();
+                                    Console.WriteLine("Please enter the desired URL complexity");
+                                    Console.WriteLine("add 'l' for letters, 'n' for numbers and 's' for special characters");
+                                    complexity = Console.ReadLine();
                                 }
                                 break;
 
@@ -394,7 +411,58 @@ namespace DeepSpider
                             case 'n':
                                 hashing = false;
                                 break;
-/*
+
+                            //brute force all urls given the complexity and length
+                            case 'j':
+                                urlArray = new string[1];
+                                isList = false;
+                                iteration = -1;
+                                darknet = false;
+                                Console.Clear();
+                                Console.WriteLine("Brute force is cool");
+                                if (item.Length > 1)
+                                {
+                                    if (int.TryParse(item.Remove(0, 1), out amount))
+                                    {
+                                        urlCharArr = new int[urlLengthMax+1];
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine("The amount specified in config.txt will be used, so most likely 0");
+                                    }
+                                    for (int i = 0; i < urlCharArr.Length; i++)
+			                        {
+                                        urlCharArr[i] = -1;
+			                        }
+                                    connect = true;
+                                }
+                                break;
+
+                                /*
+                            case 'd':
+                                urlArray = new string[1];
+                                isList = false;
+                                iteration = -1;
+                                darknet = false;
+                                amount = (int)Math.Pow(26,5);
+                                Console.Clear();
+                                Console.WriteLine("Debug mode");
+                                urlCharArr = new int[urlLengthMax+1];
+                                for (int i = 0; i < urlCharArr.Length; i++)
+			                    {
+                                    urlCharArr[i] = -1;
+			                    }
+                                watchy.Start();
+                                for (int i = 0; i < amount; i++)
+			                    {
+                                    url = IterateURL(darknet);
+                                }
+                                watchy.Stop();
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine(watchy.ElapsedMilliseconds);
+                                Console.ForegroundColor = ConsoleColor.White;
+                                break;
+                                
                             case 's':
                                 Console.Clear();
                                 Console.WriteLine("Settings:");
@@ -442,20 +510,35 @@ namespace DeepSpider
                         Console.WriteLine("Crawling the Web...");
                         if(isList)
                         {
-                            Console.WriteLine("AMount of adresses in the list: " + amount);
+                            Console.WriteLine("Amount of adresses in the list: " + amount);
                         }
                         else
                         {
                             Console.WriteLine("Amount: " + amount + ", MaxLength: " + urlLengthMax + ", MinLength: " + urlLengthMin + ", URL Comlexity: " + complexity);
                         }                      
                     }
-                    if(isList && listPos <= urlArray.Length)
-                    {
-                        Connect(darknet, "dummy");
+                    if(amount > 0){
+                        if(isList && listPos <= urlArray.Length)
+                        {
+                            Connect(darknet, "dummy");
+                        }
+                        else if(listPos < urlArray.Length && iteration == 0)
+                        {
+                            Connect(darknet, RandomURL(darknet));
+                        }
+                        //bruteforces all urls
+                        else if(iteration == -1)
+                        {
+                            Connect(darknet, IterateURL(darknet));
+                        }
                     }
-                    else if(listPos < urlArray.Length)
+                    else
                     {
-                        Connect(darknet, RandomURL(darknet));
+                        Console.Clear();
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("the amount is set to 0");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        UserInteraction(Console.ReadLine());
                     }
                 }
             }
@@ -540,9 +623,13 @@ namespace DeepSpider
                                 {
                                     Connect(darknet, "dummy");
                                 }
-                                else if(listPos < urlArray.Length)
+                                else if(listPos < urlArray.Length && iteration == 0)
                                 {
                                     Connect(darknet, RandomURL(darknet));
+                                }
+                                else if(iteration > 0)
+                                {
+                                    Connect(darknet, IterateURL(darknet));
                                 }
                             }
                         }
@@ -552,9 +639,13 @@ namespace DeepSpider
                             {
                                 Connect(darknet, "dummy");
                             }
-                            else if(listPos < urlArray.Length)
+                            else if(listPos < urlArray.Length && iteration == 0)
                             {
                                 Connect(darknet, RandomURL(darknet));
+                            }
+                            else if(iteration > 0)
+                            {
+                                Connect(darknet, IterateURL(darknet));
                             }
                             else if (amount == 0)
                             {
@@ -570,9 +661,13 @@ namespace DeepSpider
                             {
                                 Connect(darknet, "dummy");
                             }
-                            else if(listPos < urlArray.Length)
+                            else if(listPos < urlArray.Length && iteration == 0)
                             {
                                 Connect(darknet, RandomURL(darknet));
+                            }
+                            else if(iteration > 0)
+                            {
+                                Connect(darknet, IterateURL(darknet));
                             }
                         }
                         else if (amount == 0)
@@ -589,9 +684,13 @@ namespace DeepSpider
                         {
                             Connect(darknet, "dummy");
                         }
-                        else if(listPos < urlArray.Length)
+                        else if(listPos < urlArray.Length && iteration == 0)
                         {
                             Connect(darknet, RandomURL(darknet));
+                        }
+                        else if(iteration > 0)
+                        {
+                            Connect(darknet, IterateURL(darknet));
                         }
                     }
                     else if (amount == 0)
@@ -695,25 +794,35 @@ namespace DeepSpider
                         {
                             Console.ForegroundColor = ConsoleColor.DarkYellow;
                             Console.WriteLine("Updating the entry in the DataBase");
-
-                            if(command.ExecuteNonQuery() > 0)
-                            {
-                                Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                                Console.WriteLine("Updated!");
+                            try{
+                                if(command.ExecuteNonQuery() > 0)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                                    Console.WriteLine("Updated!");
+                                }
                             }
-                            else
+                            catch(Exception)
                             {
                                 Console.ForegroundColor = ConsoleColor.Red;
                                 Console.WriteLine("Couldn't update for some reason");
                             }                      
                             Console.ForegroundColor = ConsoleColor.White;
+                            update = false;
                         }
                         else
                         {
                             Console.ForegroundColor = ConsoleColor.DarkYellow;
                             Console.WriteLine("Adding the entry to the DataBase");
                             Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                            Console.WriteLine("Added to the DB - affected rows: " + command.ExecuteNonQuery());
+                            try
+                            {
+                                Console.WriteLine("Added to the DB - affected rows: " + command.ExecuteNonQuery());
+                            }
+                            catch(Exception)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                Console.WriteLine("Couldn't save to the db");
+                            }                      
                             Console.ForegroundColor = ConsoleColor.White;
                         }
 
@@ -763,147 +872,146 @@ namespace DeepSpider
             {
                 //generate a new clearnet address
                 url = "";
+                complexityArr = complexity.ToCharArray();
                 int urlLength = randomNr.Next(urlLengthMin, urlLengthMax);
-                //Console.WriteLine("The Url will be " + urlLength + " charachters long.");
 
-                //creates a random url given the complexity and maximum length
+                //creates a random url given the complexity and length
 
-                //letters
-                if (complexity.Contains("l"))
-                {
-                    //letters and numbers
-                    if (complexity.Contains("n"))
-                    {
-                        //letters, numbers, and special charachters: _ -
-                        if (complexity.Contains("s"))
+                foreach (var item in complexityArr)
+	            {
+                    switch(item){
+
+                        //adds all chars to a list to use in url generation
+                        case 'l':
+                        foreach(var c in "abcdefghijklmnopqrstuvwxyz".ToCharArray())
                         {
-                            for (int i = 0; i < urlLength; i++)
-                            {
-
-                                int x = randomNr.Next(0, 37);
-                                if (x <= 9)
-                                {
-                                    url += x;
-                                }
-                                else if (x >= 10 && x <= 35)
-                                {
-                                    x += 87;
-                                    char s = (char)x;
-                                    url += s;
-                                }
-                                else if (x == 36)
-                                {
-                                    url += "-";
-                                }
-                            }
+                            urlChars.Add(c);
                         }
+                            break;
 
-                        //only letters and numbers
-                        else
+                        case 'n':
+                        for(int i = 0; i<10;i++)
                         {
-                            for (int i = 0; i < urlLength; i++)
-                            {
-
-                                int x = randomNr.Next(0, 36);
-                                if (x <= 9)
-                                {
-                                    url += x;
-                                }
-                                else if (x >= 10 && x <= 35)
-                                {
-                                    x += 87;
-                                    char s = (char)x;
-                                    url += s;
-                                }
-                            }
+                            urlChars.Add(i.ToString().ToCharArray()[0]);
                         }
+                            break;
+                        
+                        case 's':
+                        foreach(var c in "-~_".ToCharArray())
+                        {
+                            urlChars.Add(c);
+                        }
+                            break;
                     }
+	            }
 
-                    //letters and special charachters: _ -
-                    else
-                    {
-                        if (complexity.Contains("s"))
-                        {
-                            for (int i = 0; i < urlLength; i++)
-                            {
-
-                                int x = randomNr.Next(0, 26);
-                                if (x >= 0 && x <= 25)
-                                {
-                                    x += 97;
-                                    char s = (char)x;
-                                    url += s;
-                                }
-                                else if (x == 26)
-                                {
-                                    url += "-";
-                                }
-                            }
-                        }
-
-                        //only letters
-                        else
-                        {
-                            for (int i = 0; i < urlLength; i++)
-                            {
-                                int x = randomNr.Next(0, 26);
-                                if (x >= 0 && x <= 25)
-                                {
-                                    x += 97;
-                                    char s = (char)x;
-                                    url += s;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                //numbers
-                else if (complexity.Contains("n"))
-                {
-                    //numbers and special chararcters
-                    if (complexity.Contains("s"))
-                    {
-                        for (int i = 0; i < urlLength; i++)
-                        {
-                            int x = randomNr.Next(0, 11);
-                            if (x <= 9)
-                            {
-                                url += x;
-                            }
-                            else if (x == 10)
-                            {
-                                url += "-";
-                            }
-                        }
-                    }
-
-                    //numbers only
-                    else
-                    {
-                        for (int i = 0; i < urlLength; i++)
-                        {
-                            int x = randomNr.Next(0, 10);
-                            if (x <= 9)
-                            {
-                                url += x;
-                            }
-                        }
-                    }
-                }
-
-                //special chars only
-                else
-                {
-                    for (int i = 0; i < urlLength; i++)
-                    {
-                        url += "-";
-                    }
-                }
+                for (int i = 0; i < urlLength; i++)
+			    {
+                    url += urlChars.ElementAt(randomNr.Next(0,urlChars.Count()));
+			    }
 
                 url = "http://www." + url + tld;
                 return url;
             }
+        }
+
+        //generates a new address to scrape
+        private static string IterateURL(bool darknet)
+        {
+            if (darknet)
+            {
+                //generate a new .onion address
+                return "";
+            }
+            else if(iteration < urlCharArr.Length)
+            {
+                //generate a new clearnet address
+                url = "";
+                complexityArr = complexity.ToCharArray();
+
+                //creates a random url given the complexity and length
+                if(iteration == -1) 
+                {
+                    foreach (var item in complexityArr)
+	                {
+                        switch(item){
+
+                            //adds all chars to a list to use in url generation
+                            case 'l':
+                            foreach(var c in "abcdefghijklmnopqrstuvwxyz".ToCharArray())
+                            {
+                                urlChars.Add(c);
+                            }
+                                break;
+
+                            case 'n':
+                            for(int i = 0; i<10;i++)
+                            {
+                                urlChars.Add(i.ToString().ToCharArray()[0]);
+                            }
+                                break;
+
+                            case 's':
+                            foreach(var c in "-~_".ToCharArray())
+                            {
+                                urlChars.Add(c);
+                            }
+                                break;
+                        }
+	                }
+                    iteration = 1;
+                }
+
+                //test params -j100-n-cn-u0-m3
+
+                if(urlCharArr[iteration-1] < urlChars.Count()-1)
+                {
+                    urlCharArr[iteration-1]++;
+                }
+                else
+                {
+                    for (int k = urlCharArr.Length - 1; k >= 0 ; k--)
+			        {   
+                        if(urlCharArr[k] >= urlChars.Count()-1)
+                        {
+                            if(k>0)
+                            {
+                                if(urlCharArr[k - 1] < urlChars.Count()-1)
+                                {
+                                    urlCharArr[k] = 0;
+                                    urlCharArr[k - 1]++;
+                                }
+                            }
+                            count = 0;
+                            foreach (var item in urlCharArr)
+	                        {
+                                if(item >= urlChars.Count()-1)
+                                {
+                                    count++;
+                                }
+	                        }
+                            if(count == iteration)
+                            {
+                                for(int h = 0;h<iteration + 1;h++)
+                                {
+                                    urlCharArr[h] = 0;
+                                }
+                                iteration++;
+                            }
+                        }
+			        }
+                }
+
+                //translating the array into a string accoruding to the complexity
+                foreach (var item in urlCharArr)
+	            {
+                    if(item > -1){
+                        url += urlChars.ElementAt(item);
+                    }
+	            }
+                url = "http://www." + url + tld;
+                return url;
+            }else return "";            
         }
 
         //generates a sha1 hash for the given string
@@ -944,6 +1052,8 @@ namespace DeepSpider
             Console.WriteLine("use parameter -c followed by a combination of 'l' for letters, 'n' for numbers and 's' for special characters");
             Console.WriteLine("use parameter -l followed by a filepath to a .txt file to scan all websites from the given list");
             Console.WriteLine("In this file, all URLs must be seperated with a ';'.");
+            Console.WriteLine("use parameter -f to write to a local file");
+            Console.WriteLine("use parameter -n to not hash the websites");
             Console.WriteLine("use parameter -o to scan all .onion sites from a given list");
             Console.WriteLine("using parameter -h or -? or nothing takes you here");
             Console.WriteLine("[show c]opyright information");
